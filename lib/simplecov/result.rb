@@ -1,4 +1,5 @@
 require 'digest/sha1'
+require 'forwardable'
 
 module SimpleCov
   #
@@ -6,6 +7,7 @@ module SimpleCov
   # library generates (Coverage.result).
   #
   class Result
+    extend Forwardable
     # Returns the original Coverage.result used for this instance of SimpleCov::Result
     attr_reader :original_result
     # Returns all files that are applicable to this result (sans filters!) as instances of SimpleCov::SourceFile. Aliased as :source_files
@@ -16,21 +18,16 @@ module SimpleCov
     # Explicitly set the command name that was used for this coverage result. Defaults to SimpleCov.command_name
     attr_writer :command_name
 
+    def_delegators :files, :covered_percent, :covered_strength, :covered_lines, :missed_lines
+    def_delegator :files, :lines_of_code, :total_lines
+
     # Initialize a new SimpleCov::Result from given Coverage.result (a Hash of filenames each containing an array of
     # coverage data)
     def initialize(original_result)
-      @original_result = original_result.dup
-
-      # Squeeze filepaths (i.e. "/a/b/../c" becomes "/a/c")
-      @original_result.keys.each do |filename|
-        expanded_filename = File.expand_path filename
-        @original_result[expanded_filename] = @original_result.delete filename
-      end
-
-      @files = SimpleCov::FileList.new(@original_result.map do |filename, coverage|
+      @original_result = original_result.freeze
+      @files = SimpleCov::FileList.new(original_result.map do |filename, coverage|
         SimpleCov::SourceFile.new(filename, coverage) if File.file?(filename)
       end.compact.sort_by(&:filename))
-
       filter!
     end
 
@@ -42,56 +39,6 @@ module SimpleCov
     # Returns a Hash of groups for this result. Define groups using SimpleCov.add_group 'Models', 'app/models'
     def groups
       @groups ||= SimpleCov.grouped(files)
-    end
-
-    # The overall percentual coverage for this result
-    def covered_percent
-      # Make sure that weird rounding error from #15, #23 and #24 does not occur again!
-      total_lines.zero? ? 0 : 100.0 * covered_lines / total_lines
-    end
-
-    # The multiple of coverage for this result
-    def covered_strength
-      return 0 if total_lines.zero?
-      return @covered_strength if @covered_strength
-      m = 0
-      @files.each do |file|
-        original_result[file.filename].each do |line_result|
-          if line_result
-            m += line_result
-          end
-        end
-      end
-      @covered_strength = m.to_f / total_lines
-    end
-
-    # Returns the count of lines that are covered
-    def covered_lines
-      return @covered_lines if defined? @covered_lines
-      @covered_lines = 0
-      @files.each do |file|
-        original_result[file.filename].each do |line_result|
-          @covered_lines += 1 if line_result and line_result > 0
-        end
-      end
-      @covered_lines
-    end
-
-    # Returns the count of missed lines
-    def missed_lines
-      return @missed_lines if defined? @missed_lines
-      @missed_lines = 0
-      @files.each do |file|
-        original_result[file.filename].each do |line_result|
-          @missed_lines += 1 if line_result == 0
-        end
-      end
-      @missed_lines
-    end
-
-    # Total count of relevant lines (covered + missed)
-    def total_lines
-      @total_lines ||= (covered_lines + missed_lines)
     end
 
     # Applies the configured SimpleCov.formatter on this result

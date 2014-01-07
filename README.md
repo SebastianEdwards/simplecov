@@ -21,7 +21,7 @@ SimpleCov [![Build Status](https://secure.travis-ci.org/colszowka/simplecov.png)
 [Mailing List]: https://groups.google.com/forum/#!forum/simplecov "Open mailing list for discussion and announcements on Google Groups"
 [Pledgie]: http://www.pledgie.com/campaigns/18379
 
-[![You can support the development of SimpleCov via Pledgie - thanks for your help](http://www.pledgie.com/campaigns/18379.png?skin_name=chrome)][Pledgie]
+[![You can support the development of SimpleCov via Pledgie - thanks for your help](https://pledgie.com/campaigns/18379.png?skin_name=chrome)][Pledgie]
 
 SimpleCov is a code coverage analysis tool for Ruby 1.9. It uses [1.9's built-in Coverage][Coverage] library to gather code
 coverage data, but makes processing its results much easier by providing a clean API to filter, group, merge, format
@@ -155,11 +155,13 @@ to use SimpleCov with them. Here's an overview of the known ones:
    <b>parallel_tests</b>
  </td>
  <td>
-  SimpleCov does not detect parallel_test automatically yet but can be taught to do so
-  with a simple workaround explained at Issue #64.
+  As of 0.8.0, SimpleCov should correctly recognize parallel_tests and supplement your test suite names
+  with their corresponding test env numbers. Locking of the resultset cache should ensure no race conditions
+  occur when results are merged.
  </td>
  <td>
   <a href="https://github.com/colszowka/simplecov/issues/64">SimpleCov #64</a>
+  <a href="https://github.com/colszowka/simplecov/pull/185">SimpleCov #185</a>
  </td>
 </tr>
 <tr>
@@ -292,11 +294,27 @@ Defining your own filters is pretty easy: Just inherit from SimpleCov::Filter an
 the filter, a true return value from this method will result in the removal of the given source_file. The filter_argument method
 is being set in the SimpleCov::Filter initialize method and thus is set to 5 in this example.
 
+## Default root filter and coverage for things outside of it
+
+By default, SimpleCov filters everything outside of the `SimpleCov.root` directory. However, sometimes you may want
+to include coverage reports for things you include as a gem, for example a Rails Engine.
+
+Here's an example by [@lsaffie](https://github.com/lsaffie) from [#221](https://github.com/colszowka/simplecov/issues/221)
+that shows how you can achieve just that:
+
+```ruby
+SimpleCov.start :rails do
+  filters.clear # This will remove the :root_filter that comes via simplecov's defaults
+  add_filter do |src|
+    !(src.filename =~ /^#{SimpleCov.root}/) unless src.filename =~ /my_engine/
+  end
+end
+```
 
 ## Groups
 
 You can separate your source files into groups. For example, in a rails app, you'll want to have separate listings for
-Models, Controllers, Helpers, Libs and Plugins. Group definition works similar to Filters (and indeed also accepts custom
+Models, Controllers, Helpers, and Libs. Group definition works similar to Filters (and indeed also accepts custom
 filter classes), but source files end up in a group when the filter passes (returns true), as opposed to filtering results,
 which exclude files from results when the filter results in a true value.
 
@@ -406,7 +424,6 @@ SimpleCov.profiles.define 'rails' do
   add_group 'Models', 'app/models'
   add_group 'Helpers', 'app/helpers'
   add_group 'Libraries', 'lib'
-  add_group 'Plugins', 'vendor/plugins'
 end
 ```
 
@@ -521,10 +538,10 @@ available:
 
 CSV formatter for SimpleCov code coverage tool for ruby 1.9+
 
-#### [simplecov-vim](https://github.com/nyarly/Simplecov-Vim)
+#### [cadre](https://github.com/nyarly/cadre)
 *by Judson Lester*
 
-A formatter for Simplecov that emits a Vim script to mark up code files with coverage information.
+Includes a formatter for Simplecov that emits a Vim script to mark up code files with coverage information.
 
 #### [simplecov-single_file_reporter](https://github.com/grosser/simplecov-single_file_reporter)
 *by [Michael Grosser](http://grosser.it)*
@@ -552,6 +569,10 @@ interpreters add the coverage library.
 
 SimpleCov is built in [Continuous Integration] on 1.8.7, ree, 1.9.2, 1.9.3.
 
+## Want to find dead code in production?
+
+Try [coverband](https://github.com/danmayer/coverband).
+
 ## Contributing
 
 See the [contributing guide](https://github.com/colszowka/simplecov/blob/master/CONTRIBUTING.md).
@@ -562,4 +583,4 @@ Thanks to Aaron Patterson for the original idea for this!
 
 ## Copyright
 
-Copyright (c) 2010-2012 Christoph Olszowka. See MIT-LICENSE for details.
+Copyright (c) 2010-2013 Christoph Olszowka. See MIT-LICENSE for details.
